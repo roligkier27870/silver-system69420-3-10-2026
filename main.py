@@ -1,5 +1,6 @@
 import pygame
 import asyncio
+import math
 
 # ===== SETUP =====
 pygame.init()
@@ -14,6 +15,7 @@ GRASS_DARK   = (46, 125, 50)
 LINE_WHITE   = (240, 240, 240)
 BG_COLOR     = (26, 26, 46)
 NET_COLOR    = (60, 60, 60)
+NET_GRID     = (120, 120, 120)
 
 # ===== PITCH DIMENSIONS =====
 PITCH_W = 840
@@ -29,9 +31,9 @@ PITCH_BOTTOM = PITCH_Y + PITCH_H
 CX = WIDTH  // 2
 CY = HEIGHT // 2
 
-# Goal (net extends OUTWARD, away from pitch)
-GOAL_HEIGHT = 68          # taller
-GOAL_DEPTH  = 18          # how far the net extends outward
+# Goal
+GOAL_HEIGHT = 68
+GOAL_DEPTH  = 18
 GOAL_TOP    = CY - GOAL_HEIGHT // 2
 GOAL_BOTTOM = CY + GOAL_HEIGHT // 2
 
@@ -41,7 +43,7 @@ PENALTY_H = 280
 PENALTY_TOP    = CY - PENALTY_H // 2
 PENALTY_BOTTOM = CY + PENALTY_H // 2
 
-# Goal area (6-yard box)
+# Goal area
 GOAL_AREA_W = 73
 GOAL_AREA_H = 140
 GOAL_AREA_TOP    = CY - GOAL_AREA_H // 2
@@ -52,7 +54,7 @@ CENTER_RADIUS = 65
 
 # Penalty spot
 PENALTY_DIST = 88
-PENALTY_ARC_RADIUS = 65
+PENALTY_ARC_RADIUS = 88
 
 # Corner arc
 CORNER_RADIUS = 14
@@ -107,98 +109,110 @@ def draw_penalty_spots():
     pygame.draw.circle(screen, LINE_WHITE, (right_spot_x, CY), 4)
 
 
+def draw_arc_outside_box(center_x, center_y, radius, start_angle, end_angle,
+                          color, thickness, hide_left_of=None, hide_right_of=None):
+    """Draw an arc as line segments, skipping segments inside the hidden region."""
+    prev_point = None
+    steps = 80
+    for i in range(steps + 1):
+        angle = start_angle + (end_angle - start_angle) * (i / steps)
+        x = center_x + radius * math.cos(angle)
+        y = center_y + radius * math.sin(angle)
+
+        hide = False
+        if hide_left_of is not None and x < hide_left_of:
+            hide = True
+        if hide_right_of is not None and x > hide_right_of:
+            hide = True
+
+        if hide:
+            prev_point = None
+            continue
+
+        if prev_point is not None:
+            pygame.draw.line(screen, color, prev_point, (x, y), thickness)
+        prev_point = (x, y)
+
+
 def draw_penalty_arcs():
-    """
-    Draw the arcs that bulge OUT from the penalty box.
-    Left: arc opens to the RIGHT (toward midfield)
-    Right: arc opens to the LEFT (toward midfield)
-    """
-    arc_thickness = 3
+    arc_radius = PENALTY_ARC_RADIUS
+    thickness = 3
+    box_edge_left  = PITCH_LEFT + PENALTY_W
+    box_edge_right = PITCH_RIGHT - PENALTY_W
 
-    # LEFT penalty arc — bulges into midfield (right side of the box)
-    left_arc_center = (PITCH_LEFT + PENALTY_DIST, CY)
-    left_rect = pygame.Rect(
-        left_arc_center[0] - PENALTY_ARC_RADIUS,
-        left_arc_center[1] - PENALTY_ARC_RADIUS,
-        PENALTY_ARC_RADIUS * 2,
-        PENALTY_ARC_RADIUS * 2
+    # LEFT penalty arc — bulges right (into midfield), only outside the box
+    draw_arc_outside_box(
+        PITCH_LEFT + PENALTY_DIST, CY,
+        arc_radius,
+        -math.pi / 2, math.pi / 2,
+        LINE_WHITE, thickness,
+        hide_left_of=box_edge_left
     )
-    # Angles: -60° to +60° (in radians) → bulges right
-    pygame.draw.arc(screen, LINE_WHITE, left_rect,
-                    -1.0472, 1.0472, arc_thickness)
 
-    # RIGHT penalty arc — bulges into midfield (left side of the box)
-    right_arc_center = (PITCH_RIGHT - PENALTY_DIST, CY)
-    right_rect = pygame.Rect(
-        right_arc_center[0] - PENALTY_ARC_RADIUS,
-        right_arc_center[1] - PENALTY_ARC_RADIUS,
-        PENALTY_ARC_RADIUS * 2,
-        PENALTY_ARC_RADIUS * 2
+    # RIGHT penalty arc — bulges left (into midfield), only outside the box
+    draw_arc_outside_box(
+        PITCH_RIGHT - PENALTY_DIST, CY,
+        arc_radius,
+        math.pi / 2, 3 * math.pi / 2,
+        LINE_WHITE, thickness,
+        hide_right_of=box_edge_right
     )
-    # Angles: 120° to 240° (in radians) → bulges left
-    pygame.draw.arc(screen, LINE_WHITE, right_rect,
-                    2.0944, 4.1888, arc_thickness)
 
 
 def draw_corner_arcs():
-    """Four corner quarter-circles with thinner lines."""
     thickness = 2
 
     # Top-left
     pygame.draw.arc(screen, LINE_WHITE,
                     (PITCH_LEFT, PITCH_TOP,
                      CORNER_RADIUS * 2, CORNER_RADIUS * 2),
-                    0, 1.5708, thickness)
+                    0, math.pi / 2, thickness)
 
     # Top-right
     pygame.draw.arc(screen, LINE_WHITE,
                     (PITCH_RIGHT - CORNER_RADIUS * 2, PITCH_TOP,
                      CORNER_RADIUS * 2, CORNER_RADIUS * 2),
-                    1.5708, 3.1416, thickness)
+                    math.pi / 2, math.pi, thickness)
 
     # Bottom-left
     pygame.draw.arc(screen, LINE_WHITE,
                     (PITCH_LEFT, PITCH_BOTTOM - CORNER_RADIUS * 2,
                      CORNER_RADIUS * 2, CORNER_RADIUS * 2),
-                    4.7124, 6.2832, thickness)
+                    3 * math.pi / 2, 2 * math.pi, thickness)
 
     # Bottom-right
     pygame.draw.arc(screen, LINE_WHITE,
                     (PITCH_RIGHT - CORNER_RADIUS * 2, PITCH_BOTTOM - CORNER_RADIUS * 2,
                      CORNER_RADIUS * 2, CORNER_RADIUS * 2),
-                    3.1416, 4.7124, thickness)
+                    math.pi, 3 * math.pi / 2, thickness)
 
 
 def draw_goal(side):
-    """Draw a goal with proper depth and a grid net."""
     if side == "left":
-        # Net extends to the LEFT (away from pitch)
         gx = PITCH_LEFT - GOAL_DEPTH
     else:
-        # Net extends to the RIGHT (away from pitch)
         gx = PITCH_RIGHT
 
     gy = GOAL_TOP
     gw = GOAL_DEPTH
     gh = GOAL_HEIGHT
 
-    # Net background (dark)
+    # Net background
     pygame.draw.rect(screen, NET_COLOR, (gx, gy, gw, gh))
 
-    # Net grid lines
+    # Net grid
     step = 6
     for i in range(gx, gx + gw + 1, step):
-        pygame.draw.line(screen, (120, 120, 120), (i, gy), (i, gy + gh), 1)
+        pygame.draw.line(screen, NET_GRID, (i, gy), (i, gy + gh), 1)
     for j in range(gy, gy + gh + 1, step):
-        pygame.draw.line(screen, (120, 120, 120), (gx, j), (gx + gw, j), 1)
+        pygame.draw.line(screen, NET_GRID, (gx, j), (gx + gw, j), 1)
 
-    # Goal frame (thick white outline)
+    # Goal frame
     pygame.draw.rect(screen, LINE_WHITE, (gx, gy, gw, gh), 3)
 
 
 def draw_pitch():
     screen.fill(BG_COLOR)
-
     draw_striped_grass()
     draw_outline()
     draw_halfway_line()
