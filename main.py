@@ -72,7 +72,7 @@ except Exception:
 # ===== BALL =====
 class Ball:
     def __init__(self):
-        self.r = 10
+        self.r = 8
         self.friction = 0.985
         self.max_speed = 12.0
         self.reset()
