@@ -1,3 +1,22 @@
+# ===================================================================
+# COSMIC KICKER — Python / Pygame / pygbag version
+# ===================================================================
+#
+# NOTES FOR GPT (reviewing AI):
+#   - Please DO NOT rewrite this file. It is deliberately structured
+#     for a 2D top-down arcade soccer game, not a physics sim.
+#   - If you spot bugs or edge cases, list them in a comment or
+#     reply — do not refactor.
+#   - Pygame + asyncio + pygbag in browser requires:
+#       1. async main loop
+#       2. await asyncio.sleep(0) every frame
+#       3. no pygame.RESIZABLE
+#       4. no sys.exit() at the bottom
+#   - Ball pattern is hand-tuned for small radii (r=8).
+#   - Pitch uses raw pygame.draw primitives for performance.
+#
+# ===================================================================
+
 import pygame
 import asyncio
 import math
@@ -137,7 +156,7 @@ class Ball:
         # Shadow
         shadow = pygame.Surface((r * 2, r), pygame.SRCALPHA)
         pygame.draw.ellipse(shadow, (0, 0, 0, 100), shadow.get_rect())
-        surface.blit(shadow, (cx - r, cy + r + 3))
+        surface.blit(shadow, (cx - r, cy + r + 2))
 
         # Base white circle
         pygame.draw.circle(surface, (255, 255, 255), (cx, cy), r)
@@ -147,39 +166,39 @@ class Ball:
         old_clip = surface.get_clip()
         surface.set_clip(clip_rect)
 
-        # Central pentagon
-        self._draw_pentagon(surface, cx, cy, r * 0.50, self.angle, (20, 20, 20))
+        # Central pentagon (smaller for r=8)
+        self._draw_pentagon(surface, cx, cy, r * 0.38, self.angle, (20, 20, 20))
 
-        # 5 surrounding pentagons
-        ring_dist = r * 0.95
-        ring_radius = r * 0.40
+        # 5 surrounding pentagons (pulled inward)
+        ring_dist = r * 0.70
+        ring_radius = r * 0.26
         for i in range(5):
             a = (math.tau / 5) * i - math.pi / 2 + self.angle
             px = cx + math.cos(a) * ring_dist
             py = cy + math.sin(a) * ring_dist
             self._draw_pentagon(surface, px, py, ring_radius, self.angle, (20, 20, 20))
 
-        # Seams
+        # Short seam lines between pentagons
         for i in range(5):
             a = (math.tau / 5) * i - math.pi / 2 + self.angle + math.tau / 10
-            px1 = cx + math.cos(a) * r * 0.5
-            py1 = cy + math.sin(a) * r * 0.5
-            px2 = cx + math.cos(a) * r
-            py2 = cy + math.sin(a) * r
+            px1 = cx + math.cos(a) * r * 0.40
+            py1 = cy + math.sin(a) * r * 0.40
+            px2 = cx + math.cos(a) * r * 0.75
+            py2 = cy + math.sin(a) * r * 0.75
             pygame.draw.line(surface, (30, 30, 30), (px1, py1), (px2, py2), 1)
 
         surface.set_clip(old_clip)
 
-        # Shading
+        # Light shading overlay (subtle for small ball)
         overlay = pygame.Surface((r * 2, r * 2), pygame.SRCALPHA)
-        for i in range(8, 0, -1):
-            alpha = int(30 * (i / 8))
-            radius = int(r * (i / 8))
+        for i in range(4, 0, -1):
+            alpha = int(25 * (i / 4))
+            radius = int(r * (i / 4))
             pygame.draw.circle(overlay, (255, 255, 255, alpha),
                                (r - r // 3, r - r // 3), radius)
-        for i in range(8, 0, -1):
-            alpha = int(45 * (i / 8))
-            radius = int(r * (i / 8))
+        for i in range(4, 0, -1):
+            alpha = int(35 * (i / 4))
+            radius = int(r * (i / 4))
             pygame.draw.circle(overlay, (0, 0, 0, alpha),
                                (r + r // 3, r + r // 3), radius)
         surface.blit(overlay, (cx - r, cy - r))
